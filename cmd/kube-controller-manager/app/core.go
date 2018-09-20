@@ -429,3 +429,30 @@ func startTTLAfterFinishedController(ctx ControllerContext) (http.Handler, bool,
 	).Run(int(ctx.ComponentConfig.TTLAfterFinishedController.ConcurrentTTLSyncs), ctx.Stop)
 	return nil, true, nil
 }
+
+func startCaConfigMapController(ctx ControllerContext) (http.Handler, bool, error) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.TokenRequest) {
+		return nil, false, nil
+	}
+
+	if ctx.ComponentConfig.SAController.RootCAFile == "" {
+		return nil, true, fmt.Errorf("no root ca file specified")
+	}
+
+	rootCA, err := readCA(ctx.ComponentConfig.SAController.RootCAFile)
+	if err != nil {
+		return nil, true, fmt.Errorf("error parsing root-ca-file at %s: %v", ctx.ComponentConfig.SAController.RootCAFile, err)
+	}
+
+	sac, err := serviceaccountcontroller.NewCaConfigMapController(
+		ctx.InformerFactory.Core().V1().ConfigMaps(),
+		ctx.InformerFactory.Core().V1().Namespaces(),
+		ctx.ClientBuilder.ClientOrDie("ca-configmap-controller"),
+		serviceaccountcontroller.DefaultCaConfigMap(rootCA),
+	)
+	if err != nil {
+		return nil, true, fmt.Errorf("error creating ca-configmap controller: %v", err)
+	}
+	go sac.Run(1, ctx.Stop)
+	return nil, true, nil
+}

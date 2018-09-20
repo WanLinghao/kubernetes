@@ -39,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/mux"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	apiserverflag "k8s.io/apiserver/pkg/util/flag"
 	cacheddiscovery "k8s.io/client-go/discovery/cached"
 	"k8s.io/client-go/informers"
@@ -54,6 +55,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/kubernetes/pkg/util/configz"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
@@ -379,6 +381,9 @@ func NewControllerInitializers(loopMode ControllerLoopMode) map[string]InitFunc 
 	controllers["pvc-protection"] = startPVCProtectionController
 	controllers["pv-protection"] = startPVProtectionController
 	controllers["ttl-after-finished"] = startTTLAfterFinishedController
+	if utilfeature.DefaultFeatureGate.Enabled(features.TokenRequest) {
+		controllers["ca-configmap"] = startCaConfigMapController
+	}
 
 	return controllers
 }
@@ -524,11 +529,7 @@ func (c serviceAccountTokenControllerStarter) startServiceAccountTokenController
 
 	var rootCA []byte
 	if ctx.ComponentConfig.SAController.RootCAFile != "" {
-		rootCA, err = ioutil.ReadFile(ctx.ComponentConfig.SAController.RootCAFile)
-		if err != nil {
-			return nil, true, fmt.Errorf("error reading root-ca-file at %s: %v", ctx.ComponentConfig.SAController.RootCAFile, err)
-		}
-		if _, err := certutil.ParseCertsPEM(rootCA); err != nil {
+		if rootCA, err = readCA(ctx.ComponentConfig.SAController.RootCAFile); err != nil {
 			return nil, true, fmt.Errorf("error parsing root-ca-file at %s: %v", ctx.ComponentConfig.SAController.RootCAFile, err)
 		}
 	} else {
@@ -557,4 +558,16 @@ func (c serviceAccountTokenControllerStarter) startServiceAccountTokenController
 	ctx.InformerFactory.Start(ctx.Stop)
 
 	return nil, true, nil
+}
+
+func readCA(file string) ([]byte, error) {
+	rootCA, err := ioutil.ReadFile(file)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := certutil.ParseCertsPEM(rootCA); err != nil {
+		return nil, err
+	}
+
+	return rootCA, err
 }

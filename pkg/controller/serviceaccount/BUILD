@@ -9,6 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "ca_configmap_controller.go",
         "doc.go",
         "serviceaccounts_controller.go",
         "tokengetter.go",

@@ -353,6 +353,16 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 		})
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.TokenRequest) {
+		addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "ca-configmap-controller"},
+			Rules: []rbacv1.PolicyRule{
+				rbacv1helpers.NewRule("create").Groups(legacyGroup).Resources("configmaps").RuleOrDie(),
+				eventsRule(),
+			},
+		})
+	}
+
 	return controllerRoles, controllerRoleBindings
 }
 
