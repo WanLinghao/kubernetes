@@ -60,17 +60,17 @@ type qosContainerManagerImpl struct {
 }
 
 func NewQOSContainerManager(subsystems *CgroupSubsystems, cgroupRoot CgroupName, nodeConfig NodeConfig, cgroupManager CgroupManager) (QOSContainerManager, error) {
-	if !nodeConfig.CgroupsPerQOS {
-		return &qosContainerManagerNoop{
-			cgroupRoot: cgroupRoot,
+	if nodeConfig.CgroupsPerQOS {
+		return &qosContainerManagerImpl{
+			subsystems:    subsystems,
+			cgroupManager: cgroupManager,
+			cgroupRoot:    cgroupRoot,
+			qosReserved:   nodeConfig.QOSReserved,
 		}, nil
 	}
 
-	return &qosContainerManagerImpl{
-		subsystems:    subsystems,
-		cgroupManager: cgroupManager,
-		cgroupRoot:    cgroupRoot,
-		qosReserved:   nodeConfig.QOSReserved,
+	return &qosContainerManagerNoop{
+		cgroupRoot: cgroupRoot,
 	}, nil
 }
 
